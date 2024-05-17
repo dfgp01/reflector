@@ -7,19 +7,26 @@ import (
 	"reflector/internal"
 )
 
-type User struct {
-	Age      int
-	Name     string
-	Children []*User
-	Parent   *User
-	Mate     map[string]*User
-	Mates    map[string][]*User
-	Adv      map[interface{}]interface{}
-}
+type (
+	User struct {
+		Age      int
+		Name     string
+		Children []*User
+		Parent   *User
+		Mate     map[string]*User
+		Mates    map[string][]*User
+		Adv      map[interface{}]interface{}
+	}
+	IPer interface {
+		Peak([]byte) string
+	}
+
+	Ali IPer
+)
 
 func main() {
 
-	ref4()
+	ref5()
 }
 
 func ref() {
@@ -120,7 +127,7 @@ func ref4() {
 
 	var d []uint16
 	bs := []byte("18,58,19,5")
-	err := encode.StringSerializer.UnMarshal(bs, &d)
+	err := encode.NumberArraySerializer.UnMarshal(bs, &d)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -128,39 +135,13 @@ func ref4() {
 	fmt.Println(d)
 }
 
-var cache = make(map[string]bool)
-
-func iter(o internal.IObject, depth int) {
-	space := "  "
-	for i := 0; i < depth; i++ {
-		space += "  "
-	}
-	switch po := o.(type) {
-	case *internal.BaseObject:
-		fmt.Printf("base %v, %v\n", po.Type(), po.RefType().Kind())
-	case *internal.StrutObject:
-		fmt.Printf("struct :%s\n ", po.Name())
-		if c, ok := cache[po.Name()]; ok && c { // 避免循环引用
-			return
-		}
-		cache[po.Name()] = true
-		for _, f := range po.Fields() {
-			iter(f, depth+1)
-		}
-	case *internal.StructFieldObject:
-		fmt.Printf(" field :%s, %v, %v\n", po.Name(), po.Type(), po.RefType().Kind())
-	case *internal.SliceObject:
-		fmt.Printf("slice %v, %v\n", po.SubType(), po.RefType().Kind())
-	case *internal.MapObject:
-		fmt.Printf("map k: %v, v: %v\n", po.KeyType(), po.ValType())
-	case *internal.PtrObject:
-		fmt.Printf("ptr sub: %v\n", po.SubType())
-		iter(po.Sub(), depth+1)
-	case *internal.InterfaceObject:
-		fmt.Printf("interface %v, %v\n", po.Type(), po.RefType().Kind())
-	}
+func ref5() {
+	var a []map[internal.IObject][]*User
+	t(a)  //[]uint16
+	t(&a) //*[]uint16
 }
 
-func ref5() {
-
+func t(v interface{}) {
+	aa := reflect.TypeOf(v).String()
+	fmt.Println(aa)
 }

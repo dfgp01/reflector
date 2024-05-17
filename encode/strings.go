@@ -8,16 +8,16 @@ import (
 )
 
 var (
-	StringSerializer  = &stringSerializer{}
-	ErrNotNumberSlice = errors.New("not number slice")
+	NumberArraySerializer = &numberArraySerializer{}
+	ErrNotNumberSlice     = errors.New("not number slice")
 )
 
 type (
-	stringSerializer struct{}
+	numberArraySerializer struct{}
 )
 
 // []int, []int32... []uint64...
-func (s *stringSerializer) Marshal(v interface{}) ([]byte, error) {
+func (s *numberArraySerializer) Marshal(v interface{}) ([]byte, error) {
 	wr, err := internal.In(v)
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (s *stringSerializer) Marshal(v interface{}) ([]byte, error) {
 }
 
 // &[]int, &[]float32...
-func (s *stringSerializer) UnMarshal(data []byte, ptr interface{}) error {
+func (s *numberArraySerializer) UnMarshal(data []byte, ptr interface{}) error {
 	if len(data) == 0 {
 		return nil
 	}

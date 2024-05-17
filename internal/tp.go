@@ -124,10 +124,15 @@ func createObjectInfo(t reflect.Type) (IObject, error) {
 }
 
 func createStructObject(obj *BaseObject) (*StrutObject, error) {
+
 	var (
 		structT = obj.refType
 		fields  []*StructFieldObject
 	)
+	if c, ok := clzCache[structT.Name()]; ok {
+		return c, nil
+	}
+
 	for i := 0; i < structT.NumField(); i++ {
 		sf := structT.Field(i)
 		fieldObj, err := createObjectInfo(sf.Type)
@@ -140,9 +145,13 @@ func createStructObject(obj *BaseObject) (*StrutObject, error) {
 			field:   sf,
 		})
 	}
-	return &StrutObject{
+
+	s := &StrutObject{
 		BaseObject: obj, fields: fields,
-	}, nil
+	}
+
+	clzCache[structT.Name()] = s
+	return s, nil
 }
 
 func createSliceObject(obj *BaseObject) (*SliceObject, error) {
@@ -171,6 +180,9 @@ func createMapObject(obj *BaseObject) (*MapObject, error) {
 		return nil, ErrInvalidMapKeyType
 	}
 	valObj, err := createObjectInfo(obj.refType.Elem())
+	if err != nil {
+		return nil, err
+	}
 	if !availableMapValType(valObj) {
 		return nil, ErrInvalidMapValType
 	}
@@ -184,23 +196,9 @@ func createMapObject(obj *BaseObject) (*MapObject, error) {
 }
 
 func createPtrObject(obj *BaseObject) (*PtrObject, error) {
-	//暂时这样写
-	pt := &PtrObject{
-		HasSubObject: &HasSubObject{
-			BaseObject: obj,
-		},
-	}
-	subT := obj.refType.Elem()
-	if subT.Kind() == reflect.Struct {
-		if c, ok := typeMapper[subT.Name()]; ok {
-			return c, nil
-		} else {
-			typeMapper[subT.Name()] = pt
-		}
-	}
 
 	//开始递归构建
-	sub, err := createObjectInfo(subT)
+	sub, err := createObjectInfo(obj.refType.Elem())
 	if err != nil {
 		return nil, err
 	}
@@ -208,6 +206,9 @@ func createPtrObject(obj *BaseObject) (*PtrObject, error) {
 		//只允许一层指针引用
 		return nil, ErrInvalidPtrType
 	}
-	pt.sub = sub
-	return pt, nil
+	return &PtrObject{
+		HasSubObject: &HasSubObject{
+			BaseObject: obj, sub: sub,
+		},
+	}, nil
 }

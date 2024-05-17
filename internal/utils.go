@@ -12,28 +12,50 @@ import (
 	重新整理一下思绪，我们的预期实现结果为：
 
 		序列化与反序列化：
-			json：{"key":"value"} 和 [{"key1":"value1"},{"key2":"value2"}]，省略，系统已实现
-			protobuf：[1,2,3,4,5....] -> &ProtoClz{}，系统已实现
-			protobuf：[1,2,3,4,5....] -> []*ProtoClz，需要我们实现
-			map[string]*ProtoClz，和 map[string][]*ProtoClz，需要我们实现
+			json <-> string:	系统已有，支持对象、数组、map[string]interface{}
+				{"key":"value"}
+				[{"key1":"value1"},{"key2":"value2"}]
+			protobuf <-> string：系统已有，仅支持对象
+				[1,2,3,4,5....] -> &ProtoClz{}
+				[1,2,3,4,5....] -> []&protoClz{}	缺
+				[1,2,3,4,5....] -> map[interface]&protoClz{} 缺
+				[1,2,3,4,5....] -> map[interface][]&protoClz{} 缺
+			map[string]interface <-> json-string:	已有
+			map[string]interface <-> string:	用json得了
+			map[number]interface <-> string:	暂时不支持
 
-		字符串转换：
-			"123" -> var a int，系统已实现
-			"1,2,3,4" -> var a []int，我们实现，扩展的有[1,2,3,4]、{1,2,3,4}、{1|2|3}|{4|5|6}等等
+			"123" <-> number	系统已实现
+			"1,2,3,4" <-> []number	缺，最好扩展{1,2,3,4}、{1|2|3}|{4|5|6}等等
 
-			"1,2,3,4" <-> []int		StringSerializer
-			"[1,2,3,4]" <-> []int		StringSerializer
-			"{1,2,3,4}" <-> []int		StringSerializer	接口无法满足规则，只能按第一个做法
+			转换表：
+			入参		出参
 
-			直接用json可以解决 map[string]interface{}
-				map[string]*struct 和 map[int]*struct等需要自己扩展
+			json		struct		有	含proto
+			json		[]struct		有	含proto
+			json		map[string]interface{}	有
+			json		[]map[string]interface{}	有
+			json		[]map[string][]interface{}	不支持
+			json		map[number]interface{}	不支持
+			json		map[number][]interface{}	不支持
+
+			struct		map[string]interface{}	github.com/mitchellh/mapstructure
+			struct		map[number]interface	不支持
+
+			bytes		&proto	有
+			bytes		[]&proto	无
+			bytes		map[string]proto	无
+			bytes		map[number]proto	无
+			bytes		map[string][]proto	无
+			bytes		map[number][]proto	无
+
+			string		number	有	"123456"	<-> int
+			string		[]number	无	"1,23,456"	<-> []int
 
 			"string" <-> map[string]proto 需要自定义string的分隔符等，否则可能有逗号冲突
 			map[string]string <-> map[string]proto 和redis可以提供原始map，问题不大
 			其实可能分两步："string" <-> map[string]string <-> map[string]proto 需要指定ProtoSerializer，否则默认用json
 			暂定的分隔符格式为："key1<->value1<->key2<->value2"
 			转换链："string" -> map[string]string -> map[int]interface
-"
 
 		提供给ORM的处理接口：
 			pager参数：不需要反射，但需要封装
@@ -45,6 +67,9 @@ import (
 					Cond{sort, group..., PagerParam{pageNo, size, total, totalPage}, param<interface>}}
 
 		外部接口：In和Out，设计handler机制
+
+		hub(in, out, args...)	args不确定要填什么
+		hub("1,2,3", &[]uint16)		需要通过in和out识别它们的类型：string, ptr-slice-number
 */
 
 /**
@@ -54,7 +79,8 @@ import (
 var (
 	// 为防止循环依赖，暂存struct-name，建议预热，避免并发读写，
 	// 也可以扩展暂存其他复杂类型的别名，如type slice32 [][]int32
-	typeMapper = make(map[string]*PtrObject)
+	typeMapper = make(map[string]IObject)
+	clzCache   = make(map[string]*StrutObject)
 
 	ErrNotClassType      = errors.New("not class type")
 	ErrInvalidObjectType = errors.New("invalid object type")
@@ -212,9 +238,6 @@ func (o *ObjectWrapper) CheckType(typeChains ...ObjType) error {
 }
 
 func MakeSliceAndAppend(ptrSlice IObject, ptrSliceV reflect.Value, data ...interface{}) {
-	if len(data) == 0 {
-		return
-	}
 
 	//ptr->slice->number
 	var (
@@ -229,6 +252,10 @@ func MakeSliceAndAppend(ptrSlice IObject, ptrSliceV reflect.Value, data ...inter
 	newPtr := reflect.New(sliceT)
 	slice.Set(newPtr.Elem())
 
+	if len(data) == 0 {
+		return
+	}
+
 	for _, d := range data {
 		slice.Set(reflect.Append(slice, reflect.ValueOf(d)))
 	}
@@ -240,4 +267,30 @@ func MakeSliceAndAppend(ptrSlice IObject, ptrSliceV reflect.Value, data ...inter
 	//ptr.type=*[]int64
 	//ptr.CanSet()=false，slice.CanSet()=false，但是ptr->slice.CanSet()=true
 	//也许这就是指针的玄机吧
+}
+
+func MakeMapAndSet(ptrMap IObject, ptrMapV reflect.Value, args ...interface{}) {
+
+	//ptr->slice->number
+	var (
+		mpT = ptrMap.RefType().Elem()
+		mp  = ptrMapV.Elem()
+	)
+
+	//这种做法可行
+	mp.Set(reflect.MakeMap(mpT))
+
+	//这种也可以
+	//newPtr := reflect.New(mpT)
+	//mp.Set(newPtr.Elem())
+
+	if len(args) == 0 && len(args)%2 > 0 {
+		return
+	}
+
+	//todo 要做类型检查
+	for i := 0; i < len(args); i += 2 {
+		mp.SetMapIndex(reflect.ValueOf(args[i]), reflect.ValueOf(args[i+1]))
+	}
+
 }
