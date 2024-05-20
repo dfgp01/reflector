@@ -2,7 +2,7 @@ package encode
 
 import (
 	"encoding/json"
-	"errors"
+	"reflector/model"
 
 	"google.golang.org/protobuf/proto"
 )
@@ -10,9 +10,6 @@ import (
 var (
 	JsonSerializer  = &jsonSerializer{}
 	ProtoSerializer = &protoSerializer{}
-	ErrProtobuf     = errors.New("can not convert protobuf message")
-	ErrDecoder      = errors.New("dest must be pointer")
-	ErrEncoder      = errors.New("obj is nil")
 )
 
 type (
@@ -35,7 +32,7 @@ func (s *jsonSerializer) UnMarshal(data []byte, ptr interface{}) error {
 func (s *protoSerializer) Marshal(v interface{}) ([]byte, error) {
 	msg, ok := v.(proto.Message)
 	if !ok {
-		return nil, ErrProtobuf
+		return nil, model.ErrProtobuf
 	}
 	return proto.Marshal(msg)
 }
@@ -43,7 +40,7 @@ func (s *protoSerializer) Marshal(v interface{}) ([]byte, error) {
 func (s *protoSerializer) UnMarshal(data []byte, ptr interface{}) error {
 	msg, ok := ptr.(proto.Message)
 	if !ok {
-		return ErrProtobuf
+		return model.ErrProtobuf
 	}
 	return proto.Unmarshal(data, msg)
 }

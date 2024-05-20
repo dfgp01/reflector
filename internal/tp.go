@@ -2,49 +2,95 @@ package internal
 
 import (
 	"reflect"
+	"reflector/model"
 )
 
-// 简单代表一下数据类型
-type ObjType int
+var (
 
-const (
-	Invalid ObjType = iota //不支持的类型，如chan、func等
-	Bool
-	Number
-	String
-	Struct
-	Slice //slice或array
-	Map
-	Interface //定义时为interace{}类型，运行时不确定
-	Ptr       //引用带头
+	// 缓存type映射
+	typeMapper = make(map[string]reflect.Type)
+
+	// 为防止循环依赖，暂存struct-name，建议预热，避免并发读写
+	clzCache = make(map[string]bool)
+
+	_int      int
+	_int8     int8
+	_int16    int16
+	_int32    int32
+	_int64    int64
+	_uint     uint
+	_uint8    uint8
+	_uint16   uint16
+	_uint32   uint32
+	_uint64   uint64
+	_float32  float32
+	_float64  float64
+	_ints     []int
+	_int8s    []int8
+	_int16s   []int16
+	_int32s   []int32
+	_int64s   []int64
+	_uints    []uint
+	_uint8s   []uint8
+	_uint16s  []uint16
+	_uint32s  []uint32
+	_uint64s  []uint64
+	_float32s []float32
+	_float64s []float64
+	_bool     bool
+	_string   string
 )
 
-// 类型归纳
-func refType(t reflect.Type) ObjType {
-	k := t.Kind()
-	if isBool(k) {
-		return Bool
-	} else if isNumber(k) {
-		return Number
-	} else if isString(k) {
-		return String
-	} else if k == reflect.Ptr {
-		return Ptr
-	} else if k == reflect.Struct {
-		return Struct
-	} else if k == reflect.Slice || k == reflect.Array {
-		return Slice
-	} else if k == reflect.Map {
-		return Map
-	} else if k == reflect.Interface {
-		return Interface
-	} else {
-		return Invalid
-	}
+func init() {
+	//缓存基础类型反射
+	hot(_int)
+	hot(_int8)
+	hot(_int16)
+	hot(_int32)
+	hot(_int64)
+
+	hot(_uint)
+	hot(_uint8)
+	hot(_uint16)
+	hot(_uint32)
+	hot(_uint64)
+
+	hot(_float32)
+	hot(_float64)
+
+	hot(_ints)
+	hot(_int8s)
+	hot(_int16s)
+	hot(_int32s)
+	hot(_int64s)
+
+	hot(_uints)
+	hot(_uint8s)
+	hot(_uint16s)
+	hot(_uint32s)
+	hot(_uint64s)
+
+	hot(_float32s)
+	hot(_float64s)
+
+	hot(_bool)
+	hot(_string)
 }
 
-func hasElem(t reflect.Type) bool {
-	return t.Kind() == reflect.Array || t.Kind() == reflect.Map || t.Kind() == reflect.Slice || t.Kind() == reflect.Pointer || t.Kind() == reflect.Ptr
+func hot(v interface{}) {
+	checkType(reflect.TypeOf(v))
+}
+
+// 不支持的类型
+func InValid(k reflect.Kind) bool {
+	return k == reflect.Invalid || k == reflect.Func || k == reflect.Chan
+}
+
+// 有下级元素
+func HasElem(k reflect.Kind) bool {
+	return k == reflect.Map ||
+		k == reflect.Array || k == reflect.Slice ||
+		k == reflect.Pointer || k == reflect.Ptr
 }
 
 func isBool(k reflect.Kind) bool {
@@ -72,143 +118,89 @@ func isInteger(k reflect.Kind) bool {
 }
 
 // 所有数值
-func isNumber(k reflect.Kind) bool {
+func IsNumber(k reflect.Kind) bool {
 	return isInteger(k) || isFloat(k)
 }
 
+// 所有数值数组
+func IsNumberSlice(t reflect.Type) bool {
+	return t.Kind() == reflect.Slice && IsNumber(t.Elem().Kind())
+}
+
 // 字符串
-func isString(k reflect.Kind) bool {
+func IsString(k reflect.Kind) bool {
 	return k == reflect.String
 }
 
+// 字符串数组
+func IsStringSlice(t reflect.Type) bool {
+	return t.Kind() == reflect.Slice && IsString(t.Elem().Kind())
+}
+
 // 所有基础类型，也是目前支持的map-key类型
-func isBaseKind(k reflect.Kind) bool {
-	return isBool(k) || isString(k) || isNumber(k)
+func IsBaseType(k reflect.Kind) bool {
+	return isBool(k) || IsString(k) || IsNumber(k)
 }
 
-// 目前map-key可支持的类型
-func availableMapKeyType(o IObject) bool {
-	return o.Type() == Interface || isBaseType(o)
+// 所有基础类型数组
+func IsBaseSlice(t reflect.Type) bool {
+	return t.Kind() == reflect.Slice && IsBaseType(t.Elem().Kind())
 }
 
-// 目前map-val可支持的类型
-func availableMapValType(o IObject) bool {
-	return o.Type() == Interface || isBaseType(o)
+func IsPtrStruct(t reflect.Type) bool {
+	return t.Kind() == reflect.Ptr && t.Elem().Kind() == reflect.Struct
 }
 
-func isBaseType(o IObject) bool {
-	return o.Type() == Bool || o.Type() == Number || o.Type() == String
+func IsPtrStructSlice(t reflect.Type) bool {
+	return t.Kind() == reflect.Slice && IsPtrStruct(t.Elem())
 }
 
-// 暂时先不用reflect.Value了
-func createObjectInfo(t reflect.Type) (IObject, error) {
-	tp := refType(t)
-	if tp == Invalid {
-		return nil, ErrInvalidObjectType
-	}
-	obj := &BaseObject{tp: tp, refType: t}
-	switch tp {
-	case Struct:
-		return createStructObject(obj)
-	case Slice:
-		return createSliceObject(obj)
-	case Map:
-		return createMapObject(obj)
-	case Interface:
-		return &InterfaceObject{BaseObject: obj}, nil
-	case Ptr:
-		return createPtrObject(obj)
-	default:
-		return obj, nil
-	}
-}
-
-func createStructObject(obj *BaseObject) (*StrutObject, error) {
-
-	var (
-		structT = obj.refType
-		fields  []*StructFieldObject
-	)
-	if c, ok := clzCache[structT.Name()]; ok {
-		return c, nil
+func checkType(t reflect.Type) error {
+	//是否已有
+	if _, ok := typeMapper[t.Name()]; ok {
+		return nil
 	}
 
-	for i := 0; i < structT.NumField(); i++ {
-		sf := structT.Field(i)
-		fieldObj, err := createObjectInfo(sf.Type)
+	if InValid(t.Kind()) {
+		return model.ErrInvalidObjectType
+	}
+
+	if HasElem(t.Kind()) {
+		switch t.Kind() {
+		case reflect.Ptr:
+			//指针合法性
+			if t.Elem().Kind() != reflect.Struct {
+				return model.ErrInvalidPtrType
+			}
+		case reflect.Map:
+			//map-key合法性
+			if IsBaseType(t.Key().Kind()) {
+				return model.ErrInvalidMapKeyType
+			}
+		}
+		err := checkType(t.Elem())
 		if err != nil {
-			//忽略这个字段
-			continue
+			return err
 		}
-		fields = append(fields, &StructFieldObject{
-			IObject: fieldObj,
-			field:   sf,
-		})
 	}
 
-	s := &StrutObject{
-		BaseObject: obj, fields: fields,
-	}
-
-	clzCache[structT.Name()] = s
-	return s, nil
-}
-
-func createSliceObject(obj *BaseObject) (*SliceObject, error) {
-	//sub type
-	sub, err := createObjectInfo(obj.refType.Elem())
-	if err != nil {
-		if err == ErrInvalidObjectType {
-			return nil, ErrInvalidSliceType
+	//struct检查
+	if t.Kind() == reflect.Struct {
+		//防循环依赖
+		if _, ok := clzCache[t.Name()]; ok {
+			return nil
+		} else {
+			clzCache[t.Name()] = true
 		}
-		return nil, err
-	}
-	return &SliceObject{
-		HasSubObject: &HasSubObject{
-			BaseObject: obj, sub: sub,
-		},
-	}, nil
-}
-
-func createMapObject(obj *BaseObject) (*MapObject, error) {
-	//key类型限制，目前只做基础类型
-	keyObj, err := createObjectInfo(obj.refType.Key())
-	if err != nil {
-		return nil, err
-	}
-	if !availableMapKeyType(keyObj) {
-		return nil, ErrInvalidMapKeyType
-	}
-	valObj, err := createObjectInfo(obj.refType.Elem())
-	if err != nil {
-		return nil, err
-	}
-	if !availableMapValType(valObj) {
-		return nil, ErrInvalidMapValType
+		for i := 0; i < t.NumField(); i++ {
+			if err := checkType(t.Field(i).Type); err != nil {
+				return err
+			}
+		}
 	}
 
-	return &MapObject{
-		HasSubObject: &HasSubObject{
-			BaseObject: obj, sub: valObj,
-		},
-		keyObj: keyObj,
-	}, nil
-}
+	//interface检查
 
-func createPtrObject(obj *BaseObject) (*PtrObject, error) {
-
-	//开始递归构建
-	sub, err := createObjectInfo(obj.refType.Elem())
-	if err != nil {
-		return nil, err
-	}
-	if sub.Type() == Ptr {
-		//只允许一层指针引用
-		return nil, ErrInvalidPtrType
-	}
-	return &PtrObject{
-		HasSubObject: &HasSubObject{
-			BaseObject: obj, sub: sub,
-		},
-	}, nil
+	typeMapper[t.Name()] = t
+	return nil
 }

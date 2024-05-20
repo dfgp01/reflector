@@ -1,8 +1,8 @@
 package internal
 
 import (
-	"errors"
 	"reflect"
+	"reflector/model"
 	"strconv"
 )
 
@@ -10,46 +10,6 @@ import (
 *	原包来自 serversdk/generic/*	还有很多没拿过来优化
 
 	重新整理一下思绪，我们的预期实现结果为：
-
-		序列化与反序列化：
-			json <-> string:	系统已有，支持对象、数组、map[string]interface{}
-				{"key":"value"}
-				[{"key1":"value1"},{"key2":"value2"}]
-			protobuf <-> string：系统已有，仅支持对象
-				[1,2,3,4,5....] -> &ProtoClz{}
-				[1,2,3,4,5....] -> []&protoClz{}	缺
-				[1,2,3,4,5....] -> map[interface]&protoClz{} 缺
-				[1,2,3,4,5....] -> map[interface][]&protoClz{} 缺
-			map[string]interface <-> json-string:	已有
-			map[string]interface <-> string:	用json得了
-			map[number]interface <-> string:	暂时不支持
-
-			"123" <-> number	系统已实现
-			"1,2,3,4" <-> []number	缺，最好扩展{1,2,3,4}、{1|2|3}|{4|5|6}等等
-
-			转换表：
-			入参		出参
-
-			json		struct		有	含proto
-			json		[]struct		有	含proto
-			json		map[string]interface{}	有
-			json		[]map[string]interface{}	有
-			json		[]map[string][]interface{}	不支持
-			json		map[number]interface{}	不支持
-			json		map[number][]interface{}	不支持
-
-			struct		map[string]interface{}	github.com/mitchellh/mapstructure
-			struct		map[number]interface	不支持
-
-			bytes		&proto	有
-			bytes		[]&proto	无
-			bytes		map[string]proto	无
-			bytes		map[number]proto	无
-			bytes		map[string][]proto	无
-			bytes		map[number][]proto	无
-
-			string		number	有	"123456"	<-> int
-			string		[]number	无	"1,23,456"	<-> []int
 
 			"string" <-> map[string]proto 需要自定义string的分隔符等，否则可能有逗号冲突
 			map[string]string <-> map[string]proto 和redis可以提供原始map，问题不大
@@ -76,20 +36,10 @@ import (
 *	额外的快捷接口，逻辑和这包里的关系不大
  */
 
-var (
-	// 为防止循环依赖，暂存struct-name，建议预热，避免并发读写，
-	// 也可以扩展暂存其他复杂类型的别名，如type slice32 [][]int32
-	typeMapper = make(map[string]IObject)
-	clzCache   = make(map[string]*StrutObject)
-
-	ErrNotClassType      = errors.New("not class type")
-	ErrInvalidObjectType = errors.New("invalid object type")
-	ErrInvalidSliceType  = errors.New("invalid slice type")
-	ErrInvalidMapKeyType = errors.New("invalid map key type")
-	ErrInvalidMapValType = errors.New("invalid map value type")
-	ErrInvalidPtrType    = errors.New("invalid ptr type")
-	ErrCheckType         = errors.New("check type error")
-)
+// 获取反射信息
+func TV(v interface{}) (reflect.Type, reflect.Value) {
+	return reflect.TypeOf(v), reflect.ValueOf(v)
+}
 
 // 通过反射获得struct的名，参数类型范围：struct{}, *struct{}, []struct{}, []*struct{}
 func GetClassName(v interface{}) (string, error) {
@@ -104,7 +54,7 @@ func digClassName(t reflect.Type) (string, error) {
 	case reflect.Ptr, reflect.Array, reflect.Slice:
 		return digClassName(t.Elem())
 	default:
-		return "", ErrNotClassType
+		return "", model.ErrNotClassType
 	}
 }
 
@@ -204,37 +154,27 @@ func StringToFloat64(numberStr string) float64 {
 //  1. bool, int, string 等基础类型，以及数组切片等
 //  2. *struct{}, []*struct{}
 //  3. map[string]string, map[interface{}]interface{}
-func In(v interface{}) (*ObjectWrapper, error) {
-	t, val := reflect.TypeOf(v), reflect.ValueOf(v)
-	obj, err := createObjectInfo(t)
+func ReadIn(v interface{}) (*Object, error) {
+	tp, val := TV(v)
+	head := tp
+	if tp.Kind() == reflect.Ptr {
+		tp = tp.Elem()
+	}
+	err := checkType(tp)
 	if err != nil {
 		return nil, err
 	}
-	return &ObjectWrapper{
-		Root:    obj,
-		HeadPtr: obj.Type() == Ptr,
-		Val:     val,
+	return &Object{
+		RefTp:   head,
+		RefVal:  val,
+		HeadPtr: head.Kind() == reflect.Ptr,
 	}, nil
 }
 
-type ObjectWrapper struct {
-	Root    IObject
+type Object struct {
+	RefTp   reflect.Type
+	RefVal  reflect.Value
 	HeadPtr bool
-	Val     reflect.Value
-}
-
-func (o *ObjectWrapper) CheckType(typeChains ...ObjType) error {
-	head := o.Root
-	for _, tp := range typeChains {
-		if head == nil {
-			return ErrCheckType
-		}
-		if tp != head.Type() {
-			return ErrCheckType
-		}
-		head = head.Sub()
-	}
-	return nil
 }
 
 func MakeSliceAndAppend(ptrSlice IObject, ptrSliceV reflect.Value, data ...interface{}) {

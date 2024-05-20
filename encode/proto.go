@@ -13,11 +13,6 @@ const (
 	MaxSegSize    = 1<<16 - 1 //单个数据段最大64k-1
 )
 
-var (
-	ErrMaxPacket = errors.New("max packet size")
-	ErrMaxSeg    = errors.New("max seg size")
-)
-
 /*
 *
 仅用于pb数组的二进制协议文

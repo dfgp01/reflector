@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"reflect"
-	"reflector/encode"
-	"reflector/internal"
 )
 
 type (
@@ -112,36 +110,11 @@ func ref3() {
 	fmt.Printf("b: tk: %v, vk: %v, valid: %v\n", t2.Kind(), v2.Kind(), v2.IsValid())
 }
 
-func ref4() {
-	//var a *User
-	//var b = User{Age: 1}
-	//var c = &User{Age: 123, Name: "123"}
-
-	// d := []float32{1.1, 2.2, 3.3, 4.3444}
-	// bs, err := encode.StringSerializer.Marshal(d)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
-	// fmt.Println(bs, string(bs))
-
-	var d []uint16
-	bs := []byte("18,58,19,5")
-	err := encode.NumberArraySerializer.UnMarshal(bs, &d)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(d)
-}
-
 func ref5() {
-	var a []map[internal.IObject][]*User
-	t(a)  //[]uint16
-	t(&a) //*[]uint16
-}
+	var a int8
+	var b [][]int8
 
-func t(v interface{}) {
-	aa := reflect.TypeOf(v).String()
-	fmt.Println(aa)
+	aa := reflect.TypeOf(&a).Elem()
+	bb := reflect.TypeOf(&b).Elem().Elem().Elem()
+	fmt.Println(aa == bb)
 }

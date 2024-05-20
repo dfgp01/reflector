@@ -1,4 +1,4 @@
-package internal
+package v2
 
 import (
 	"reflect"
@@ -38,11 +38,28 @@ type BaseObject struct {
 func (o *BaseObject) ValidType() bool       { return o.tp != Invalid }
 func (o *BaseObject) Type() ObjType         { return o.tp }
 func (o *BaseObject) RefType() reflect.Type { return o.refType }
-func (o *BaseObject) Make(v interface{})    {}
 func (o *BaseObject) SubType() ObjType      { return Invalid }
 func (o *BaseObject) Sub() IObject          { return nil }
 func (o *BaseObject) KeyType() ObjType      { return Invalid }
 func (o *BaseObject) ValType() ObjType      { return Invalid }
+
+type BoolObject struct {
+	*BaseObject
+}
+
+func (o *BoolObject) Type() ObjType { return Bool }
+
+type NumberObject struct {
+	*BaseObject
+}
+
+func (o *NumberObject) Type() ObjType { return Number }
+
+type StringObject struct {
+	*BaseObject
+}
+
+func (o *StringObject) Type() ObjType { return String }
 
 // 字段信息
 type StructFieldObject struct {

@@ -7,10 +7,13 @@ import (
 	"strings"
 )
 
-// 提供一个默认的序列化
-func Encoder(v interface{}, serializer ...encode.ISerializer) ([]byte, error) {
-	if v == nil {
-		return nil, model.ErrEncoder
+// 提供一个默认的反序列化
+func Decoder(data []byte, dest interface{}, serializer ...encode.ISerializer) error {
+	if dest == nil {
+		return model.ErrDecoder
+	}
+	if len(data) == 0 {
+		return nil
 	}
 
 	var ser encode.ISerializer
@@ -20,9 +23,9 @@ func Encoder(v interface{}, serializer ...encode.ISerializer) ([]byte, error) {
 		ser = encode.JsonSerializer
 	}
 
-	wrap, err := internal.ReadIn(v)
+	wrap, err := internal.ReadIn(dest)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	head, tp := wrap.RefTp, wrap.RefTp
 	if wrap.HeadPtr {
@@ -45,21 +48,5 @@ func Encoder(v interface{}, serializer ...encode.ISerializer) ([]byte, error) {
 		}
 	}
 
-	return ser.Marshal(v)
-
-	//is number slice?
-	//is number?
-
-	//proto
-	//proto slice
-
-	//map[string]interface{}
-
-	//(int, int8, 16, 32, 64, f32, f64) * 2 * 2 = 28种
-	//目前只需要加NumberSerializer和ProtoExtSerializer即可
-
-	//从最简单的开始，number or []number
-	//NumberSerializer
-	//然后判断是否指定了ProtoSerializer，然后还要根据情况选择ProtoExtSerializer
-	//最后默认就是用JsonSerializer
+	return ser.UnMarshal(data, dest)
 }
