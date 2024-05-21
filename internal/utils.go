@@ -177,11 +177,11 @@ type Object struct {
 	HeadPtr bool
 }
 
-func MakeSliceAndAppend(ptrSlice IObject, ptrSliceV reflect.Value, data ...interface{}) {
+func MakeSliceAndAppend(ptrSlice reflect.Type, ptrSliceV reflect.Value, data ...interface{}) {
 
-	//ptr->slice->number
+	//ptr->slice
 	var (
-		sliceT = ptrSlice.RefType().Elem()
+		sliceT = ptrSlice.Elem()
 		slice  = ptrSliceV.Elem()
 	)
 
@@ -209,11 +209,11 @@ func MakeSliceAndAppend(ptrSlice IObject, ptrSliceV reflect.Value, data ...inter
 	//也许这就是指针的玄机吧
 }
 
-func MakeMapAndSet(ptrMap IObject, ptrMapV reflect.Value, args ...interface{}) {
+func MakeMapAndSet(ptrMap reflect.Type, ptrMapV reflect.Value, args ...interface{}) {
 
-	//ptr->slice->number
+	//ptr->map
 	var (
-		mpT = ptrMap.RefType().Elem()
+		mpT = ptrMap.Elem()
 		mp  = ptrMapV.Elem()
 	)
 
@@ -224,6 +224,7 @@ func MakeMapAndSet(ptrMap IObject, ptrMapV reflect.Value, args ...interface{}) {
 	//newPtr := reflect.New(mpT)
 	//mp.Set(newPtr.Elem())
 
+	//参数格式错误
 	if len(args) == 0 && len(args)%2 > 0 {
 		return
 	}

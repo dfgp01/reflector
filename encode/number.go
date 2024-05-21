@@ -23,7 +23,7 @@ func (s *numberSerializer) Marshal(v interface{}) ([]byte, error) {
 
 	//is number?
 	if internal.IsNumber(t.Kind()) {
-		return []byte(fmt.Sprintf("%v,", val.Interface())), nil
+		return []byte(fmt.Sprintf("%v", val.Interface())), nil
 	}
 
 	//is slice number?
@@ -50,24 +50,27 @@ func (s *numberSerializer) UnMarshal(data []byte, dest interface{}) error {
 	if len(data) == 0 {
 		return nil
 	}
-	t, v := reflect.TypeOf(dest), reflect.ValueOf(dest)
+	t, v := internal.TV(dest)
+
+	//is not ptr
 	if t.Kind() != reflect.Ptr {
-		return ErrNotPtrType
+		return model.ErrInvalidPtrType
 	}
-	tp := t.Elem()
+	head := t
+	t = t.Elem()
 
 	//is number?
-	if internal.IsNumber(tp.Kind()) {
-		number := internal.StringToNumber(string(data), tp.Kind())
+	if internal.IsNumber(t.Kind()) {
+		number := internal.StringToNumber(string(data), t.Kind())
 		v.Elem().Set(reflect.ValueOf(number))
 		return nil
 	}
 
 	//is slice number?
-	if internal.IsNumberSlice(tp) {
+	if internal.IsNumberSlice(t) {
 		var (
 			//ptr->slice->number
-			kind               = tp.Elem().Kind()
+			kind               = t.Elem().Kind()
 			numberStrs         = strings.Split(string(data), ",")
 			numbersUnknownType []interface{}
 		)
@@ -75,31 +78,9 @@ func (s *numberSerializer) UnMarshal(data []byte, dest interface{}) error {
 		for _, numberStr := range numberStrs {
 			numbersUnknownType = append(numbersUnknownType, internal.StringToNumber(numberStr, kind))
 		}
-		internal.MakeSliceAndAppend(t, val, numbersUnknownType...)
+		internal.MakeSliceAndAppend(head, v, numbersUnknownType...)
 		return nil
 	}
 
-	return ErrNotNumberSlice
-
-	wr, err := internal.In(ptr)
-	if err != nil {
-		return err
-	}
-	if err = wr.CheckType(internal.Ptr, internal.Slice, internal.Number); err != nil {
-		return err
-	}
-
-	var (
-		//ptr->slice->number
-		kind               = wr.Root.RefType().Elem().Elem().Kind()
-		numberStrs         = strings.Split(string(data), ",")
-		numbersUnknownType []interface{}
-	)
-
-	for _, numberStr := range numberStrs {
-		numbersUnknownType = append(numbersUnknownType, internal.StringToNumber(numberStr, kind))
-	}
-	internal.MakeSliceAndAppend(wr.Root, wr.Val, numbersUnknownType...)
-
-	return nil
+	return model.ErrNotNumberSlice
 }

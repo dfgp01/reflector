@@ -3,23 +3,19 @@ package main
 import (
 	"fmt"
 	"reflect"
+	"reflector/utils"
 )
 
 type (
 	User struct {
-		Age      int
-		Name     string
-		Children []*User
-		Parent   *User
-		Mate     map[string]*User
-		Mates    map[string][]*User
-		Adv      map[interface{}]interface{}
+		Age      int                         `json:"age,omitempty"`
+		Name     string                      `json:"name,omitempty"`
+		Children []*User                     `json:"children,omitempty"`
+		Parent   *User                       `json:"parent,omitempty"`
+		Mate     map[string]*User            `json:"mates,omitempty"`
+		Mates    map[string][]*User          `json:"mates,omitempty"`
+		Adv      map[interface{}]interface{} `json:"adv,omitempty"`
 	}
-	IPer interface {
-		Peak([]byte) string
-	}
-
-	Ali IPer
 )
 
 func main() {
@@ -111,10 +107,16 @@ func ref3() {
 }
 
 func ref5() {
-	var a int8
-	var b [][]int8
+	//基础类型测试已通过，下面进行json和protobuf测试
+	var a float32 = 111.333
+	var b []float64 = []float64{1.32, 2.7778}
+	var c = "1,2,3,4,5"
+	var d string = "aaaaab"
+	var e []string = []string{"1", "2", "3,", "4,7", "5"}
 
-	aa := reflect.TypeOf(&a).Elem()
-	bb := reflect.TypeOf(&b).Elem().Elem().Elem()
-	fmt.Println(aa == bb)
+	err := utils.Decoder([]byte("1.222,4,5.655"), &b)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(a, b, c, d, e)
 }

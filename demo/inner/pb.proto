@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+// 定义一个包名
+package inner;
+
+// 指定Go包名和输出路径
+//option go_package = ".;inner";  // 默认输出到当前目录
+option go_package = "reflector/demo/inner;inner";
+
+// 定义一个简单的消息类型
+message Student {
+    string name = 1;
+    int32 age = 2;
+    repeated string hobbies = 3;
+}
+
+// 定义复杂一些的消息类型
+message Person {
+  // 字符串类型的name字段
+  string name = 1;
+  // 32位整型的id字段
+  int32 id = 2;
+  // 可选的注释字段
+  bool reg = 3;
+  // 可重复的Person字段
+  repeated Person children = 4;
+}
+
+// 可以定义一个包含多个Person的集合
+message People {
+  repeated Person people = 1;
+}

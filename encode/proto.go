@@ -1,9 +1,10 @@
 package encode
 
 import (
-	"errors"
+	"fmt"
 	"reflect"
 	"reflector/internal"
+	"reflector/model"
 
 	"google.golang.org/protobuf/proto"
 )
@@ -30,10 +31,10 @@ func (p *Packet) append(data []byte) error {
 		return nil
 	}
 	if size > MaxSegSize {
-		return ErrMaxSeg
+		return model.ErrMaxSeg
 	}
 	if len(p.b)+size > MaxPacketSize {
-		return ErrMaxPacket
+		return model.ErrMaxPacket
 	}
 	//16位整数拆成两个byte
 	p.b = append(p.b, byte(size>>8), byte(size))
@@ -76,72 +77,76 @@ func (p *Packet) data() []byte {
 
 var (
 	ProtoSliceSerializer = &protoSliceSerializer{}
-	ErrProtobufSlice     = errors.New("can not convert protobuf slice")
 )
 
 type protoSliceSerializer struct{}
 
 // v is []proto.Message
 func (s *protoSliceSerializer) Marshal(v interface{}) ([]byte, error) {
-	msg, ok := v.([]proto.Message)
-	if !ok {
-		return nil, ErrProtobufSlice
+
+	tp, val := internal.TV(v)
+
+	if !internal.IsPtrStructSlice(tp) {
+		return nil, model.ErrNotStructSlice
 	}
+
 	pk := &Packet{}
-	for _, m := range msg {
-		seg, err := proto.Marshal(m)
+	for i := 0; i < val.Len(); i++ {
+		seg, err := ProtoSerializer.Marshal(val.Index(i).Interface())
 		if err != nil {
 			return nil, err
 		}
 		pk.append(seg)
 	}
-	if pk.l != len(msg) {
-		//错误处理
+	if pk.l != val.Len() {
+		//todo 错误处理
+		fmt.Println(pk.l, val.Len(), "not match")
 	}
 	return pk.data(), nil
 }
 
 // ptr is &[]proto.Message
-func (s *protoSliceSerializer) UnMarshal(data []byte, ptr interface{}) error {
-	//类型判断：&[]proto.Message
-	// msg, ok := ptr.(*[]proto.Message)
-	// if !ok {
-	// 	return ErrProtobufSlice
-	// }
+func (s *protoSliceSerializer) UnMarshal(data []byte, dest interface{}) error {
 
-	//如果上面不行，用这种......是否需要接入reflector.internal里的sdk?
-	internal.In(ptr)
-	tp := reflect.TypeOf(ptr)
-	if tp.Kind() != reflect.Ptr {
-		return ErrProtobufSlice
+	if len(data) == 0 {
+		return nil
 	}
-	tp = tp.Elem()
-	if tp.Kind() != reflect.Slice {
-		return ErrProtobufSlice
+	t, v := internal.TV(dest)
+
+	//is not ptr
+	if t.Kind() != reflect.Ptr {
+		return model.ErrInvalidPtrType
 	}
-	//head-ptr here
-	tp = tp.Elem()
-	if tp.Kind() != reflect.Ptr {
-		return ErrProtobufSlice
-	}
-	if tp.Elem().Kind() != reflect.Struct {
-		return ErrProtobufSlice
-	}
+	head := t
+	t = t.Elem()
 
 	pk := &Packet{b: data}
 	segs := pk.split()
 	if len(segs) == 0 {
-		return nil
+		return model.ErrPacketSeg
 	}
 
-	// for _, val := range segs {
-	// 	//通过反射初始化proto
-	// 	err := ProtoSerializer.UnMarshal(val, m)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	//追加到slice
-	// 	*msg = append(*msg, m)
-	// }
+	//is slice->ptr->struct?
+	if internal.IsPtrStructSlice(t) {
+		var (
+			structT = t.Elem().Elem()
+			pbList  []interface{}
+		)
+
+		for _, seg := range segs {
+			//此处可考虑封装
+			newPb := reflect.New(structT)
+			if _, ok := newPb.Interface().(proto.Message); ok {
+				err := ProtoSerializer.UnMarshal(seg, newPb.Interface())
+				if err != nil {
+					return err
+				}
+				pbList = append(pbList, newPb.Interface())
+			} else {
+				return model.ErrProtobufSlice
+			}
+		}
+		internal.MakeSliceAndAppend(head, v, pbList...)
+	}
 	return nil
 }

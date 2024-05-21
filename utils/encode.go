@@ -4,7 +4,6 @@ import (
 	"reflector/encode"
 	"reflector/internal"
 	"reflector/model"
-	"strings"
 )
 
 // 提供一个默认的序列化
@@ -29,10 +28,8 @@ func Encoder(v interface{}, serializer ...encode.ISerializer) ([]byte, error) {
 		tp = head.Elem()
 	}
 
-	if internal.IsString(tp.Kind()) {
-		return []byte(v.(string)), nil
-	} else if internal.IsStringSlice(tp) {
-		return []byte(strings.Join(v.([]string), ",")), nil
+	if internal.IsString(tp.Kind()) || internal.IsStringSlice(tp) {
+		ser = encode.StringSerializer
 	}
 
 	if internal.IsNumber(tp.Kind()) || internal.IsNumberSlice(tp) {
