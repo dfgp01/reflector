@@ -23,17 +23,11 @@ func Decoder(data []byte, dest interface{}, serializer ...encode.ISerializer) er
 		ser = encode.JsonSerializer
 	}
 
-	wrap, err := internal.ReadIn(dest)
+	refTp, _, err := internal.ReadIn(dest, true)
 	if err != nil {
 		return err
 	}
-	if !wrap.HeadPtr {
-		return model.ErrInvalidPtrType
-	}
-	head, tp := wrap.RefTp, wrap.RefTp
-	if wrap.HeadPtr {
-		tp = head.Elem()
-	}
+	tp := refTp.Elem()
 
 	//映射目标是字符串或字符串数组
 	if internal.IsString(tp.Kind()) || internal.IsStringSlice(tp) {

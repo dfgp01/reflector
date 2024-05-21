@@ -1,7 +1,6 @@
 package encode
 
 import (
-	"reflect"
 	"reflector/internal"
 	"reflector/model"
 	"strings"
@@ -18,7 +17,10 @@ type (
 // []string
 func (s *stringSerializer) Marshal(v interface{}) ([]byte, error) {
 
-	t, val := internal.TV(v)
+	t, val, err := internal.ReadIn(v, false)
+	if err != nil {
+		return nil, err
+	}
 
 	//is string?
 	if internal.IsString(t.Kind()) {
@@ -38,14 +40,12 @@ func (s *stringSerializer) UnMarshal(data []byte, dest interface{}) error {
 	if len(data) == 0 {
 		return nil
 	}
-	t, v := internal.TV(dest)
 
-	//is not ptr
-	if t.Kind() != reflect.Ptr {
-		return model.ErrInvalidPtrType
+	t, v, err := internal.ReadIn(dest, true)
+	if err != nil {
+		return err
 	}
-	head := t
-	t = t.Elem()
+	head, t := t, t.Elem()
 
 	// is string?
 	if internal.IsString(t.Kind()) {

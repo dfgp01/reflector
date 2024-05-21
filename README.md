@@ -3,21 +3,21 @@ golang 反射小助手
 
 #   预期序列化目标
 
-转换目标|转换目标|支持情况|说明
+序列化类型|反序列化类型|支持情况|说明
 :---:|:---:|:---:|:---:
 string|number|支持|使用strconv
 string|[]number|支持|用逗号隔开
 |||
-json|struct、proto|encoding/json
-json|[]struct、[]proto|encoding/json
-json|map[string]interface{}|encoding/json
-json|[]map[string]interface{}|encoding/json
+json|struct、proto|支持|encoding/json
+json|[]struct、[]proto|支持|encoding/json
+json|map[string]interface{}|支持|encoding/json
+json|[]map[string]interface{}|支持|encoding/json
 json|map[string][]interface{}|不支持|interface{}已含[]interface{}
 json|[]map[string][]interface{}|不支持|同上
 json|map[number]interface{}|不支持|json没有非字符串的key
 json|map[number][]interface{}|不支持|同上
 |||
-bytes|proto|google.golang.org/protobuf/proto|protobuf字节码
+bytes|proto|支持|google.golang.org/protobuf/proto
 bytes|[]proto|支持|protobuf字节码+包长
 bytes|map[string]proto|缺
 bytes|map[number]proto|缺

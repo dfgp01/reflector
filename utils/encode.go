@@ -19,12 +19,12 @@ func Encoder(v interface{}, serializer ...encode.ISerializer) ([]byte, error) {
 		ser = encode.JsonSerializer
 	}
 
-	wrap, err := internal.ReadIn(v)
+	refTp, _, err := internal.ReadIn(v, false)
 	if err != nil {
 		return nil, err
 	}
-	head, tp := wrap.RefTp, wrap.RefTp
-	if wrap.HeadPtr {
+	head, tp := refTp, refTp
+	if internal.IsPointer(refTp) {
 		tp = head.Elem()
 	}
 

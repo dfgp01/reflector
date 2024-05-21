@@ -84,7 +84,10 @@ type protoSliceSerializer struct{}
 // v is []proto.Message
 func (s *protoSliceSerializer) Marshal(v interface{}) ([]byte, error) {
 
-	tp, val := internal.TV(v)
+	tp, val, err := internal.ReadIn(v, false)
+	if err != nil {
+		return nil, err
+	}
 
 	if !internal.IsPtrStructSlice(tp) {
 		return nil, model.ErrNotStructSlice
@@ -111,14 +114,12 @@ func (s *protoSliceSerializer) UnMarshal(data []byte, dest interface{}) error {
 	if len(data) == 0 {
 		return nil
 	}
-	t, v := internal.TV(dest)
 
-	//is not ptr
-	if t.Kind() != reflect.Ptr {
-		return model.ErrInvalidPtrType
+	t, v, err := internal.ReadIn(dest, true)
+	if err != nil {
+		return err
 	}
-	head := t
-	t = t.Elem()
+	head, t := t, t.Elem()
 
 	pk := &Packet{b: data}
 	segs := pk.split()

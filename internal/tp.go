@@ -147,14 +147,21 @@ func IsBaseSlice(t reflect.Type) bool {
 	return t.Kind() == reflect.Slice && IsBaseType(t.Elem().Kind())
 }
 
+// ptr->struct
 func IsPtrStruct(t reflect.Type) bool {
 	return t.Kind() == reflect.Ptr && t.Elem().Kind() == reflect.Struct
 }
 
+// slice->ptr->struct
 func IsPtrStructSlice(t reflect.Type) bool {
 	return t.Kind() == reflect.Slice && IsPtrStruct(t.Elem())
 }
 
+func IsPointer(t reflect.Type) bool {
+	return t.Kind() == reflect.Ptr
+}
+
+// 递归检查类型
 func checkType(t reflect.Type) error {
 	//是否已有
 	if _, ok := typeMapper[t.Name()]; ok {

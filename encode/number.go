@@ -19,7 +19,10 @@ type (
 // []int, []int32... []uint64...
 func (s *numberSerializer) Marshal(v interface{}) ([]byte, error) {
 
-	t, val := internal.TV(v)
+	t, val, err := internal.ReadIn(v, false)
+	if err != nil {
+		return nil, err
+	}
 
 	//is number?
 	if internal.IsNumber(t.Kind()) {
@@ -50,14 +53,11 @@ func (s *numberSerializer) UnMarshal(data []byte, dest interface{}) error {
 	if len(data) == 0 {
 		return nil
 	}
-	t, v := internal.TV(dest)
-
-	//is not ptr
-	if t.Kind() != reflect.Ptr {
-		return model.ErrInvalidPtrType
+	t, v, err := internal.ReadIn(dest, true)
+	if err != nil {
+		return err
 	}
-	head := t
-	t = t.Elem()
+	head, t := t, t.Elem()
 
 	//is number?
 	if internal.IsNumber(t.Kind()) {
