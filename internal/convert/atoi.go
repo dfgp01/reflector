@@ -1,4 +1,4 @@
-package internal
+package convert
 
 import (
 	"reflect"

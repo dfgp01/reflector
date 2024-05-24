@@ -2,7 +2,7 @@ package utils
 
 import (
 	"reflect"
-	"reflector/model"
+	"reflector/internal"
 )
 
 /**
@@ -22,6 +22,6 @@ func digClassName(t reflect.Type) (string, error) {
 	case reflect.Ptr, reflect.Array, reflect.Slice:
 		return digClassName(t.Elem())
 	default:
-		return "", model.ErrNotClassType
+		return "", internal.ErrNotClassType
 	}
 }

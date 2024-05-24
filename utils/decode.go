@@ -3,13 +3,12 @@ package utils
 import (
 	"reflector/encode"
 	"reflector/internal"
-	"reflector/model"
 )
 
 // 提供一个默认的反序列化
 func Decoder(data []byte, dest interface{}, serializer ...encode.ISerializer) error {
 	if dest == nil {
-		return model.ErrDecoder
+		return encode.ErrDecoder
 	}
 	if len(data) == 0 {
 		return nil

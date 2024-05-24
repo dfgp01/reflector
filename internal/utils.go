@@ -1,27 +1,23 @@
 package internal
 
 import (
+	"errors"
 	"reflect"
-	"reflector/model"
 )
 
 /**
 *	原包来自 serversdk/generic/*	还有很多没拿过来优化
-
-		提供给ORM的处理接口：
-			pager参数：不需要反射，但需要封装
-				Pager{pageNo, size, total, totalPage, param<interface>, resp<interface>}
-				param应为传入参，resp应为指针参，如 var a []*User -> &a
-			这样我们要对param进行解析，对resp进行析构
-			一些query包装：
-				query(param<interface>, resp<interface>)，其中param可拆为：
-					Cond{sort, group..., PagerParam{pageNo, size, total, totalPage}, param<interface>}}
-
-*/
-
-/**
-*	额外的快捷接口，逻辑和这包里的关系不大
  */
+
+var (
+	ErrInvalidObjectType = errors.New("invalid object type")
+	ErrNotClassType      = errors.New("invalid struct type")
+	ErrInvalidSliceType  = errors.New("invalid slice type")
+	ErrInvalidMapKeyType = errors.New("invalid map key type")
+	ErrInvalidMapValType = errors.New("invalid map value type")
+	ErrInvalidPtrType    = errors.New("invalid ptr type")
+	ErrCheckType         = errors.New("check type error")
+)
 
 // 获取反射信息
 func TV(v interface{}) (reflect.Type, reflect.Value) {
@@ -35,7 +31,7 @@ func TV(v interface{}) (reflect.Type, reflect.Value) {
 func ReadIn(v interface{}, mustPtr bool) (reflect.Type, reflect.Value, error) {
 	tp, val := TV(v)
 	if mustPtr && tp.Kind() != reflect.Ptr {
-		return nil, val, model.ErrInvalidPtrType
+		return nil, val, ErrInvalidPtrType
 	}
 	head := tp
 	if tp.Kind() == reflect.Ptr {
@@ -105,4 +101,25 @@ func MakeMapAndSet(ptrMap reflect.Type, ptrMapV reflect.Value, args ...interface
 		mp.SetMapIndex(reflect.ValueOf(args[i]), reflect.ValueOf(args[i+1]))
 	}
 
+}
+
+// 接受参数：&Struct{}或Struct{}
+func StructIter(dest interface{}, fn func(field reflect.StructField, value reflect.Value)) error {
+	t, v, err := ReadIn(dest, false)
+	if err != nil {
+		return err
+	}
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+		v = v.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return ErrNotClassType
+	}
+	for i := 0; i < t.NumField(); i++ {
+		ft, fv := t.Field(i), v.Field(i)
+		//ft.Anonymous的情况？
+		fn(ft, fv)
+	}
+	return nil
 }

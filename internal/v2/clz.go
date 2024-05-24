@@ -2,6 +2,7 @@ package v2
 
 import (
 	"reflect"
+	"reflector/internal/convert"
 	"reflector/model"
 )
 
@@ -267,11 +268,11 @@ func (o *BaseObject) StringIn(str string, val reflect.Value) {
 		val.SetString(str)
 	case Number:
 		if isInt(val.Kind()) {
-			val.SetInt(StringToInt64(str))
+			val.SetInt(convert.StringToInt64(str))
 		} else if isUint(val.Kind()) {
-			val.SetUint(StringToUint64(str))
+			val.SetUint(convert.StringToUint64(str))
 		} else {
-			val.SetFloat(StringToFloat64(str))
+			val.SetFloat(convert.StringToFloat64(str))
 		}
 	default:
 		return

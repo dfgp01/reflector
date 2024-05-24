@@ -1,8 +1,6 @@
 package main
 
-import (
-	"reflector/demo/inner"
-)
+import "reflector/demo/ser/inner"
 
 func main() {
 	//inner.IntSerialization()

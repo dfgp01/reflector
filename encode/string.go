@@ -2,7 +2,6 @@ package encode
 
 import (
 	"reflector/internal"
-	"reflector/model"
 	"strings"
 )
 
@@ -32,7 +31,7 @@ func (s *stringSerializer) Marshal(v interface{}) ([]byte, error) {
 		return []byte(strings.Join(val.Interface().([]string), ",")), nil
 	}
 
-	return nil, model.ErrNotStringSlice
+	return nil, ErrNotStringSlice
 }
 
 // &[]string
@@ -66,5 +65,5 @@ func (s *stringSerializer) UnMarshal(data []byte, dest interface{}) error {
 		return nil
 	}
 
-	return model.ErrNotStringSlice
+	return ErrNotStringSlice
 }

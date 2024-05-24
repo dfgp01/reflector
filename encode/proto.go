@@ -1,10 +1,10 @@
 package encode
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"reflector/internal"
-	"reflector/model"
 
 	"google.golang.org/protobuf/proto"
 )
@@ -12,6 +12,12 @@ import (
 const (
 	MaxPacketSize = 1 << 19   //单个包最大512k
 	MaxSegSize    = 1<<16 - 1 //单个数据段最大64k-1
+)
+
+var (
+	ErrMaxPacket = errors.New("max packet size")
+	ErrMaxSeg    = errors.New("max seg size")
+	ErrPacketSeg = errors.New("packet and seg size not match")
 )
 
 /*
@@ -31,10 +37,10 @@ func (p *Packet) append(data []byte) error {
 		return nil
 	}
 	if size > MaxSegSize {
-		return model.ErrMaxSeg
+		return ErrMaxSeg
 	}
 	if len(p.b)+size > MaxPacketSize {
-		return model.ErrMaxPacket
+		return ErrMaxPacket
 	}
 	//16位整数拆成两个byte
 	p.b = append(p.b, byte(size>>8), byte(size))
@@ -90,7 +96,7 @@ func (s *protoSliceSerializer) Marshal(v interface{}) ([]byte, error) {
 	}
 
 	if !internal.IsPtrStructSlice(tp) {
-		return nil, model.ErrNotStructSlice
+		return nil, ErrNotStructSlice
 	}
 
 	pk := &Packet{}
@@ -124,7 +130,7 @@ func (s *protoSliceSerializer) UnMarshal(data []byte, dest interface{}) error {
 	pk := &Packet{b: data}
 	segs := pk.split()
 	if len(segs) == 0 {
-		return model.ErrPacketSeg
+		return ErrPacketSeg
 	}
 
 	//is slice->ptr->struct?
@@ -144,7 +150,7 @@ func (s *protoSliceSerializer) UnMarshal(data []byte, dest interface{}) error {
 				}
 				pbList = append(pbList, newPb.Interface())
 			} else {
-				return model.ErrProtobufSlice
+				return ErrProtobufSlice
 			}
 		}
 		internal.MakeSliceAndAppend(head, v, pbList...)

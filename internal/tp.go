@@ -2,7 +2,6 @@ package internal
 
 import (
 	"reflect"
-	"reflector/model"
 )
 
 var (
@@ -169,7 +168,7 @@ func checkType(t reflect.Type) error {
 	}
 
 	if InValid(t.Kind()) {
-		return model.ErrInvalidObjectType
+		return ErrInvalidObjectType
 	}
 
 	if HasElem(t.Kind()) {
@@ -177,12 +176,12 @@ func checkType(t reflect.Type) error {
 		case reflect.Ptr:
 			//指针合法性
 			if t.Elem().Kind() != reflect.Struct {
-				return model.ErrInvalidPtrType
+				return ErrInvalidPtrType
 			}
 		case reflect.Map:
 			//map-key合法性
 			if IsBaseType(t.Key().Kind()) {
-				return model.ErrInvalidMapKeyType
+				return ErrInvalidMapKeyType
 			}
 		}
 		err := checkType(t.Elem())

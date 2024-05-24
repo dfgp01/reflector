@@ -3,13 +3,12 @@ package utils
 import (
 	"reflector/encode"
 	"reflector/internal"
-	"reflector/model"
 )
 
 // 提供一个默认的序列化
 func Encoder(v interface{}, serializer ...encode.ISerializer) ([]byte, error) {
 	if v == nil {
-		return nil, model.ErrEncoder
+		return nil, encode.ErrEncoder
 	}
 
 	var ser encode.ISerializer
