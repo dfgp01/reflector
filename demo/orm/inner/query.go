@@ -2,8 +2,7 @@ package inner
 
 import (
 	"fmt"
-	"reflector/orm/model"
-	"reflector/orm/mysql"
+	"reflector/dao/mysql"
 	"time"
 )
 
@@ -25,10 +24,10 @@ func Open() {
 	if err != nil {
 		panic(err)
 	}
-	err = dao1.AutoCreateTable(&TestUser{})
-	if err != nil {
-		panic(err)
-	}
+	// err = dao1.AutoCreateTable(&TestUser{}, &ProductOrder{})
+	// if err != nil {
+	// 	panic(err)
+	// }
 	dao = dao1
 }
 
@@ -72,10 +71,61 @@ func GetOne() {
 	//如果你想避免ErrRecordNotFound错误，你可以使用Find，比如db.Limit(1).Find(&user)，Find方法可以接受struct和slice的数据。
 }
 
-func Query() {
-	order := &ProductOrder{
-		ProductID: 123, UserId: 456, Price: 10086.25, Amount: 99, Total: 65535.99,
+func CreateOrder() {
+	//多条记录
+	orders := []*ProductOrder{
+		{ProductID: 1000, UserId: 4, Price: 10.25, Amount: 10},
+		{ProductID: 1000, UserId: 4, Price: 10.25, Amount: 20},
+		{ProductID: 1001, UserId: 5, Price: 5.36, Amount: 99},
 	}
-	q := &model.Query{}
-	q.Model(order).AddColumn("user_count", model.AggrCount).Debug()
+	for i := 0; i < 10; i++ {
+		orders = append(orders, orders[:]...)
+	}
+
+	//calc total
+	for _, val := range orders {
+		val.Total = val.Price * float32(val.Amount)
+	}
+
+	err := dao.Create(orders)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	for _, user := range orders {
+		fmt.Println(user.ID)
+	}
+
+	fmt.Println(len(orders))
+}
+
+func Query() {
+	param := &ManagerOperLog{Method: "/group", OperId: 1000}
+	var result []*ManagerOperLog
+	err := dao.OrmQuery(param, &result)
+	if err != nil {
+		fmt.Println(err)
+	}
+	for _, val := range result {
+		fmt.Println(val)
+	}
+}
+
+func Check() {
+	var tables []string
+	var total int
+	var result []string
+	db := dao.Driver()
+	err := db.Raw("SHOW TABLES").Scan(&tables).Error
+	if err != nil {
+		fmt.Println(err)
+	}
+	for _, val := range tables {
+		err = db.Select("COUNT(1)").Table(val).Scan(&total).Error
+		if err != nil {
+			fmt.Println(err)
+		}
+		result = append(result, fmt.Sprintf("%s %d\n", val, total))
+	}
+	fmt.Println(result)
 }

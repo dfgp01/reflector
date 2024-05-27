@@ -50,9 +50,9 @@ type Query struct {
 	err error
 	p   *Pager
 
-	cols  []*Column
-	group []*GroupField
-	sorts []*SortField
+	cols   []*Column
+	groups []*Column
+	sorts  []*Column
 
 	havings    []*Filter
 	rootHaving *Filter
@@ -65,19 +65,32 @@ func (q *Query) Err() error {
 	return q.err
 }
 
+func (q *Query) Pager() *Pager {
+	return q.p
+}
+
+func (q *Query) Params() ([]*Column, *Filter, []*Column, *Filter, []*Column) {
+	return q.cols, q.rootCond, q.groups, q.rootHaving, q.sorts
+}
+
+func NewQuery(pager ...*Pager) *Query {
+	if len(pager) > 0 {
+		return &Query{p: pager[0]}
+	}
+	return &Query{}
+}
+
 func (q *Query) SetPage(p *Pager) *Query {
+	p.init()
 	q.p = p
 	return q
 }
 
-// 反射解析模型，转换为sql查询参数
-func (q *Query) Model(dest interface{}) *Query {
-	//传进来一个&User{}，解析，然后换成filters?????
-	//没有tag的话没法做
-
-	q.err = internal.StructIter(dest, func(field reflect.StructField, value reflect.Value) {
-		ts := strings.Split(field.Tag.Get(tagName), splitor)
-		if len(ts) == 0 {
+// 反射解析模型，转换为sql查询参数，需要带有dao-tag的struct
+func (q *Query) Model(param interface{}) *Query {
+	q.err = internal.StructIter(param, func(field reflect.StructField, value reflect.Value) {
+		options := strings.Split(field.Tag.Get(tagName), splitor)
+		if len(options) == 0 {
 			return
 		}
 
@@ -87,68 +100,48 @@ func (q *Query) Model(dest interface{}) *Query {
 		}
 
 		//dao-tags
-		for _, option := range ts {
+		for _, option := range options {
+			var (
+				op, exp string
+			)
+			pairs := strings.Split(option, kvPair)
+			op = pairs[0]
+			if len(pairs) > 1 {
+				exp = pairs[1]
+			}
+
 			//有值才处理
 			if !value.IsZero() {
-				switch option {
+				switch op {
 				case equal, notEqual, in, notIn:
 					//字符串、数值皆可
-					q.and(columnField, option)
+					q.and(columnField, op)
 				case greaterThan, greaterEqual, lessThan, lessEqual:
 					//仅限数值
-					q.and(columnField, option)
+					q.and(columnField, op)
 				case fuzzyAll, fuzzyPrefix, fuzzySuffix:
 					//仅限字符串
-					q.and(columnField, option)
-				}
-
-				//having条件
-				if strings.Contains(option, having) {
-					havingPair := strings.Split(option, kvPair)
-					if len(havingPair) == 2 {
-						q.havingAnd(columnField, havingPair[1])
-					}
+					q.and(columnField, op)
+				case having:
+					q.havingAnd(columnField, exp)
 				}
 			}
 
-			//指定column名：
-			if strings.Contains(option, column) {
-				columnPair := strings.Split(option, kvPair)
-				if len(columnPair) == 2 {
-					field.Name = columnPair[1]
-				}
-			}
-
-			switch option {
+			switch op {
 			case show, sum, count, min, max, avg, distinct:
-				q.addColumn(columnField, option)
-			}
-
-			//group by 字段
-			var (
-				groupNo int
-			)
-			if strings.Contains(option, groupBy) {
-				groupPair := strings.Split(option, kvPair)
-				if len(groupPair) == 2 {
-					groupNo = convert.StringToInt(groupPair[1])
+				q.addColumn(columnField, op, exp)
+			case groupBy:
+				var groupNo int
+				if exp != "" {
+					groupNo = convert.StringToInt(exp)
 				}
 				q.addGroup(columnField, groupNo)
-			}
-
-			//排序字段
-			var (
-				sortStr string
-				no      int
-			)
-			if strings.Contains(option, sortA) || strings.Contains(option, sortD) {
-
-				sortPair := strings.Split(option, kvPair)
-				if len(sortPair) == 2 {
-					no = convert.StringToInt(sortPair[1])
+			case sortA, sortD:
+				var sortNo int
+				if exp != "" {
+					sortNo = convert.StringToInt(exp)
 				}
-				sortStr = sortPair[0]
-				q.addSort(columnField, sortStr, no)
+				q.addSort(columnField, op, sortNo)
 			}
 		}
 
@@ -156,11 +149,11 @@ func (q *Query) Model(dest interface{}) *Query {
 	if q.err != nil {
 		return q
 	}
-	sort.Slice(q.group, func(i, j int) bool {
-		return q.group[i].no < q.group[j].no
+	sort.Slice(q.groups, func(i, j int) bool {
+		return q.groups[i].groupNo < q.groups[j].groupNo
 	})
 	sort.Slice(q.sorts, func(i, j int) bool {
-		return q.sorts[i].no < q.sorts[j].no
+		return q.sorts[i].sortNo < q.sorts[j].sortNo
 	})
 	if len(q.conds) > 0 {
 		q.rootCond = And(q.conds...)
@@ -189,45 +182,8 @@ func (q *Query) havingAnd(columnField *Column, sym string) {
 	q.havings = append(q.havings, f)
 }
 
-func (q *Query) addGroup(columnField *Column, no int) {
-	q.group = append(q.group, &GroupField{columnField, no})
-}
-
-func (q *Query) addColumn(columnField *Column, aggr string) {
-	switch aggr {
-	case sum:
-		columnField.Aggr = AggrSum
-	case count:
-		columnField.Aggr = AggrCount
-	case min:
-		columnField.Aggr = AggrMin
-	case max:
-		columnField.Aggr = AggrMax
-	case avg:
-		columnField.Aggr = AggrAvg
-	case distinct:
-		columnField.Aggr = AggrCountDistinct
-	default:
-		columnField.Aggr = AggrNone
-	}
-	q.cols = append(q.cols, columnField)
-}
-
-func (q *Query) addSort(columnField *Column, sort string, no int) {
-	s := &SortField{columnField, SortNone, no}
-	switch sort {
-	case sortA:
-		s.or = SortAsc
-	case sortD:
-		s.or = SortDesc
-	default:
-		//nothing
-	}
-	q.sorts = append(q.sorts, s)
-}
-
 func newFilter(columnField *Column, sym string) *Filter {
-	f := &Filter{col: columnField}
+	f := &Filter{Col: columnField}
 	switch sym {
 	case equal:
 		f.Mc = MatchEq
@@ -258,10 +214,6 @@ func newFilter(columnField *Column, sym string) *Filter {
 	return f
 }
 
-func (q *Query) Hook(fn func(cols []*Column, conds []*Filter, having *Filter)) {
-
-}
-
 func (q *Query) Debug() {
 
 	if q.err != nil {
@@ -274,26 +226,26 @@ func (q *Query) Debug() {
 	fmt.Print("\n")
 
 	fmt.Print("group: ")
-	for _, val := range q.group {
+	for _, val := range q.groups {
 		fmt.Printf("%s, ", val.Name)
 	}
 	fmt.Print("\n")
 
 	fmt.Print("sorts: ")
 	for _, val := range q.sorts {
-		fmt.Printf("%s %v, ", val.Name, val.or)
+		fmt.Printf("%s %v, ", val.Name, val.So)
 	}
 	fmt.Print("\n")
 
-	fmt.Print("having: %v\n", q.rootHaving)
+	fmt.Printf("having: %v\n", q.rootHaving)
 	for _, val := range q.rootHaving.Sub {
-		fmt.Printf(" %v %v %v, \n", val.col.Name, val.Mc, val.col.Val)
+		fmt.Printf(" %v %v %v, \n", val.Col.Name, val.Mc, val.Col.Val)
 	}
 	fmt.Print("\n")
 
 	fmt.Printf("cond: %v\n", q.rootCond)
 	for _, val := range q.rootCond.Sub {
-		fmt.Printf(" %v %v %v, \n", val.col.Name, val.Mc, val.col.Val)
+		fmt.Printf(" %v %v %v, \n", val.Col.Name, val.Mc, val.Col.Val)
 	}
 	fmt.Print("\n")
 }

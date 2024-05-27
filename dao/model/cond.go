@@ -18,7 +18,7 @@ const (
 	MatchLe                         //<=
 	MatchGt                         //>
 	MatchGe                         //>=
-	MatchRange                      // between(n, m)
+	MatchRange                      // between(n, m)	暂时不做
 	MatchIn                         // in [...]
 	MatchNotIn                      // !in [...]
 	MatchFuzzyAll                   // like %str%
@@ -30,7 +30,7 @@ type Filter struct {
 	Lc  LogicCondition
 	Mc  MatchCondition
 	Sub []*Filter
-	col *Column
+	Col *Column
 }
 
 // and 至少提供两组filter
@@ -76,7 +76,7 @@ func FuzzySuffix(k string, v interface{}) *Filter { return filterMatch(k, v, Mat
 
 func filterMatch(k string, v interface{}, match MatchCondition) *Filter {
 	return &Filter{
-		col: &Column{
+		Col: &Column{
 			Name: k,
 			Val:  v,
 		},
