@@ -83,3 +83,34 @@ func filterMatch(k string, v interface{}, match MatchCondition) *Filter {
 		Mc: match,
 	}
 }
+func newFilter(columnField *Column, sym string) *Filter {
+	f := &Filter{Col: columnField}
+	switch sym {
+	case equal:
+		f.Mc = MatchEq
+	case notEqual:
+		f.Mc = MatchNe
+	case in:
+		f.Mc = MatchIn
+	case notIn:
+		f.Mc = MatchNotIn
+	case lessThan:
+		f.Mc = MatchLt
+	case lessEqual:
+		f.Mc = MatchLe
+	case greaterThan:
+		f.Mc = MatchGt
+	case greaterEqual:
+		f.Mc = MatchGe
+	case fuzzyAll:
+		f.Mc = MatchFuzzyAll
+	case fuzzyPrefix:
+		f.Mc = MatchFuzzyPrefix
+	case fuzzySuffix:
+		f.Mc = MatchFuzzySuffix
+	default:
+		//error match
+		return nil
+	}
+	return f
+}

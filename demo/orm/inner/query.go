@@ -71,34 +71,6 @@ func GetOne() {
 	//如果你想避免ErrRecordNotFound错误，你可以使用Find，比如db.Limit(1).Find(&user)，Find方法可以接受struct和slice的数据。
 }
 
-func CreateOrder() {
-	//多条记录
-	orders := []*ProductOrder{
-		{ProductID: 1000, UserId: 4, Price: 10.25, Amount: 10},
-		{ProductID: 1000, UserId: 4, Price: 10.25, Amount: 20},
-		{ProductID: 1001, UserId: 5, Price: 5.36, Amount: 99},
-	}
-	for i := 0; i < 10; i++ {
-		orders = append(orders, orders[:]...)
-	}
-
-	//calc total
-	for _, val := range orders {
-		val.Total = val.Price * float32(val.Amount)
-	}
-
-	err := dao.Create(orders)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	for _, user := range orders {
-		fmt.Println(user.ID)
-	}
-
-	fmt.Println(len(orders))
-}
-
 func Query() {
 	param := &ManagerOperLog{Method: "/group", OperId: 1000}
 	var result []*ManagerOperLog

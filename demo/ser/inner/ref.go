@@ -6,6 +6,15 @@ import (
 	"reflector/utils"
 )
 
+type (
+	User struct {
+		Age      int     `json:"age,omitempty"`
+		Name     string  `json:"name,omitempty"`
+		Children []*User `json:"children,omitempty"`
+		Parent   *User   `json:"parent,omitempty"`
+	}
+)
+
 // 整型的序列化和反序列化
 func IntSerialization() {
 

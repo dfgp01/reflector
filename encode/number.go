@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"reflector/internal"
-	"reflector/internal/convert"
+	"reflector/tools"
 	"strings"
 )
 
@@ -61,7 +61,7 @@ func (s *numberSerializer) UnMarshal(data []byte, dest interface{}) error {
 
 	//is number?
 	if internal.IsNumber(t.Kind()) {
-		number := convert.StringToNumber(string(data), t.Kind())
+		number := tools.StringToNumber(string(data), t.Kind())
 		v.Elem().Set(reflect.ValueOf(number))
 		return nil
 	}
@@ -76,7 +76,7 @@ func (s *numberSerializer) UnMarshal(data []byte, dest interface{}) error {
 		)
 
 		for _, numberStr := range numberStrs {
-			numbersUnknownType = append(numbersUnknownType, convert.StringToNumber(numberStr, kind))
+			numbersUnknownType = append(numbersUnknownType, tools.StringToNumber(numberStr, kind))
 		}
 		internal.MakeSliceAndAppend(head, v, numbersUnknownType...)
 		return nil

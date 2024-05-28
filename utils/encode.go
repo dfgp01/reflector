@@ -42,20 +42,4 @@ func Encoder(v interface{}, serializer ...encode.ISerializer) ([]byte, error) {
 	}
 
 	return ser.Marshal(v)
-
-	//is number slice?
-	//is number?
-
-	//proto
-	//proto slice
-
-	//map[string]interface{}
-
-	//(int, int8, 16, 32, 64, f32, f64) * 2 * 2 = 28种
-	//目前只需要加NumberSerializer和ProtoExtSerializer即可
-
-	//从最简单的开始，number or []number
-	//NumberSerializer
-	//然后判断是否指定了ProtoSerializer，然后还要根据情况选择ProtoExtSerializer
-	//最后默认就是用JsonSerializer
 }

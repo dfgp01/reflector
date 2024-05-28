@@ -67,24 +67,17 @@ func (d *Dao) Create(record interface{}) error {
 	return nil
 }
 
-//根据条件查询
-
+// 根据条件查询，param是带有query标签的struct，dest是gorm的&struct或&[]*struct模型
 func (d *Dao) OrmQuery(param, dest interface{}, pager ...*model.Pager) error {
 	q := model.NewQuery(pager...).Model(param)
 	if q.Err() != nil {
 		return q.Err()
 	}
-	var (
-		page *model.Pager
-	)
-	if len(pager) > 0 {
-		q.SetPage(pager[0])
-		page = q.Pager()
-	}
+
 	db := d.engine
-	cols, cond, groups, having, sorts := q.Params()
 
 	//where条件
+	cond := q.Cond()
 	if cond != nil {
 		if len(cond.Sub) > 0 {
 			for _, filter := range cond.Sub {
@@ -98,6 +91,7 @@ func (d *Dao) OrmQuery(param, dest interface{}, pager ...*model.Pager) error {
 	}
 
 	//having条件
+	having := q.Having()
 	if having != nil {
 		if len(having.Sub) > 0 {
 			for _, filter := range having.Sub {
@@ -111,6 +105,7 @@ func (d *Dao) OrmQuery(param, dest interface{}, pager ...*model.Pager) error {
 	}
 
 	//group by 字段
+	groups := q.Groups()
 	if len(groups) > 0 {
 		for _, col := range groups {
 			db = db.Group(col.Name)
@@ -118,6 +113,7 @@ func (d *Dao) OrmQuery(param, dest interface{}, pager ...*model.Pager) error {
 	}
 
 	//分页查询，先查总数
+	page := q.Pager()
 	if page != nil {
 		var total int32
 		err := db.Select("COUNT(1) as total").First(&total).Error
@@ -128,12 +124,13 @@ func (d *Dao) OrmQuery(param, dest interface{}, pager ...*model.Pager) error {
 	}
 
 	var ss []string
-	for _, c := range cols {
+	for _, c := range q.Columns() {
 		ss = append(ss, aggrSelect(c))
 	}
-	//selector := strings.Join(ss, ",")
+	//selectCols := strings.Join(ss, ",")
 	db = db.Select(ss)
 
+	sorts := q.Sorts()
 	if len(sorts) > 0 {
 		for _, col := range sorts {
 			db = db.Order(sortBy(col.Name, col.So))
@@ -141,7 +138,7 @@ func (d *Dao) OrmQuery(param, dest interface{}, pager ...*model.Pager) error {
 	}
 
 	if page != nil {
-		db = db.Limit(int(page.Rows * page.No)).Offset(int(page.Rows))
+		db = db.Limit(int(page.Rows * (page.No - 1))).Offset(int(page.Rows))
 	}
 	if err := db.Find(dest).Error; err != nil {
 		return err

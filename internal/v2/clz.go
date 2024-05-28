@@ -3,7 +3,6 @@ package v2
 import (
 	"reflect"
 	"reflector/internal/convert"
-	"reflector/model"
 )
 
 var (

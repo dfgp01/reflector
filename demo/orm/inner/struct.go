@@ -17,23 +17,13 @@ type (
 		//DefaultAt   time.Time    // 非指针time类型，测试空值
 	}
 
-	ProductOrder struct {
-		gorm.Model
-		ProductID uint    `dao:"show;group=1"`
-		UserId    uint    `dao:"show;group=2;asc=2"`
-		Price     float32 `dao:"gt"`
-		Amount    uint
-		Total     float32 `dao:"sum;desc;having=gt"`
-		Ct        uint    `dao:"count;distinct"`
-	}
-
 	//param
 	ManagerOperLog struct {
-		Method        string `dao:"show;_%;group=3"`
-		RequestMethod string `dao:"distinct"`
-		Status        int    `dao:"distinct"`
-		OperId        int    `dao:"count;having=gt"`
-		Group         string `dao:"count"`
-		Url           string `dao:"distinct=oper_url"`
+		Method        string `query:"show;_%;group=3"`
+		RequestMethod string `query:"distinct"`
+		Status        int    `query:"distinct"`
+		OperId        int    `query:"count;having=gt"`
+		Group         string `query:"count"`
+		Url           string `query:"distinct=oper_url"`
 	}
 )
